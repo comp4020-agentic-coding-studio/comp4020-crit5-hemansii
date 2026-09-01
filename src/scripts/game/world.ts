@@ -45,26 +45,30 @@ export interface Toy {
   palette: Palette;
 }
 
+/** Thin shelves, 8px rather than a full block. */
+const SHELF = 8;
+
 /**
- * Level layout. The critical path is all at floor level plus the low steps
- * behind the gate, so the heavier water form can walk the whole puzzle; the
- * taller platforms are dry-form territory.
+ * Level layout. Every climb is sized so BOTH forms clear it with room to spare
+ * (see spec/puzzle.test.ts) — no platform needs a pixel-perfect jump. The
+ * shelves are thin for the same reason: a 16px block low enough for the heavy
+ * form to jump onto is too low for it to walk beneath, and 8px resolves that.
  */
 export const platforms: Rect[] = [
   { x: 0, y: FLOOR_Y, width: CANVAS_WIDTH, height: TILE_SIZE }, // floor
-  { x: 44, y: 88, width: 32, height: TILE_SIZE },
-  { x: 96, y: 60, width: 32, height: TILE_SIZE },
-  { x: 142, y: 88, width: 32, height: TILE_SIZE },
-  { x: 178, y: 0, width: 16, height: 48 }, // door beam; seals the top of the gateway
-  { x: 206, y: 112, width: 16, height: TILE_SIZE }, // step, behind the gate
+  { x: 52, y: 98, width: 44, height: SHELF }, // the puddle shelf
+  { x: 104, y: 68, width: 36, height: SHELF },
+  { x: 72, y: 40, width: 32, height: SHELF },
+  { x: 170, y: 0, width: 16, height: 48 }, // door beam; seals the top of the gateway
+  { x: 196, y: 112, width: 16, height: TILE_SIZE }, // step, behind the gate
   { x: 224, y: 92, width: 32, height: TILE_SIZE }, // reward ledge
 ];
 
 export const toys: Toy[] = [
-  { x: 53, y: 74, grid: TOY_BALL_GRID, palette: TOY_BALL_PALETTE },
-  { x: 78, y: 114, grid: TOY_BALL_GRID, palette: TOY_BALL_PALETTE },
-  { x: 104, y: 46, grid: TOY_PLUSH_GRID, palette: TOY_PLUSH_PALETTE },
-  { x: 148, y: 70, grid: TOY_BLOCK_GRID, palette: TOY_BLOCK_PALETTE },
+  { x: 80, y: 22, grid: TOY_BLOCK_GRID, palette: TOY_BLOCK_PALETTE },
+  { x: 112, y: 54, grid: TOY_PLUSH_GRID, palette: TOY_PLUSH_PALETTE },
+  { x: 150, y: 114, grid: TOY_BALL_GRID, palette: TOY_BALL_PALETTE },
+  { x: 197, y: 98, grid: TOY_BALL_GRID, palette: TOY_BALL_PALETTE },
   { x: 232, y: 76, grid: TOY_ROCKET_GRID, palette: TOY_ROCKET_PALETTE },
 ];
 
@@ -343,7 +347,7 @@ export function drawPuddle(
   if (amount <= 0.02) return;
 
   const cx = PUDDLE.x + PUDDLE.width / 2;
-  const cy = FLOOR_Y - 1;
+  const cy = PUDDLE.y + PUDDLE.height - 1;
   const breathe = Math.sin(time * 2.2) * 0.5;
   const rx = (PUDDLE.width / 2) * amount + breathe;
   const ry = 3 * amount;
@@ -401,12 +405,73 @@ export function drawPlate(
   ctx.fillRect(PLATE_X, top, 1, faceHeight);
   ctx.fillRect(PLATE_X + PLATE_WIDTH - 1, top, 1, faceHeight);
 
+  // Chunky end brackets, so the whole thing reads as a mechanism rather than
+  // a stripe painted on the floorboards.
+  for (const bx of [PLATE_X - 4, PLATE_X + PLATE_WIDTH]) {
+    ctx.fillStyle = PUZZLE_PALETTE.metalDark;
+    ctx.fillRect(bx, wellTop - 2, 4, PLATE_TRAVEL + 6);
+    ctx.fillStyle = PUZZLE_PALETTE.metal;
+    ctx.fillRect(bx, wellTop - 2, 4, 1);
+    ctx.fillStyle = PUZZLE_PALETTE.metalLight;
+    ctx.fillRect(bx, wellTop - 2, 1, 1);
+  }
+
   // A light body gets movement but no light: the plate is clearly a moving
   // part that simply is not moving enough.
   if (state.lightTouch) {
     const flicker = Math.sin(time * 18) > 0 ? 0.4 : 0.12;
     ctx.fillStyle = `rgba(255, 122, 69, ${flicker})`;
     ctx.fillRect(PLATE_X + 1, top, PLATE_WIDTH - 2, 1);
+  }
+
+  drawPlateLamp(ctx, state, time);
+}
+
+/**
+ * The plate's state readout, mounted on the wall above it and clear of the
+ * floor. Dark when idle, flashing amber under something too light, steady
+ * green once it latches — the whole rule of the puzzle, told in one lamp.
+ */
+function drawPlateLamp(
+  ctx: CanvasRenderingContext2D,
+  state: PuzzleState,
+  time: number,
+): void {
+  const cx = PLATE_X + PLATE_WIDTH / 2;
+  const y = 100;
+
+  ctx.fillStyle = PUZZLE_PALETTE.plateFrame;
+  ctx.fillRect(cx - 5, y - 1, 10, 8);
+  ctx.fillStyle = PUZZLE_PALETTE.metalDark;
+  ctx.fillRect(cx - 4, y, 8, 6);
+  ctx.fillStyle = PUZZLE_PALETTE.metal;
+  ctx.fillRect(cx - 4, y, 8, 1);
+
+  let bulb = "#5a4636";
+  let glow: string | null = null;
+  if (state.latched) {
+    bulb = "#8fe3b0";
+    glow = "rgba(126, 240, 192, 0.30)";
+  } else if (state.lightTouch) {
+    const on = Math.sin(time * 18) > 0;
+    bulb = on ? "#ff9a5c" : "#6b4030";
+    glow = on ? "rgba(255, 122, 69, 0.26)" : null;
+  }
+
+  ctx.fillStyle = bulb;
+  ctx.fillRect(cx - 3, y + 2, 6, 3);
+  if (state.latched) {
+    ctx.fillStyle = "#d8fbe8";
+    ctx.fillRect(cx - 3, y + 2, 6, 1);
+  }
+
+  // Light spilling down onto the plate ties the two together.
+  if (glow) {
+    const cone = ctx.createLinearGradient(0, y + 6, 0, FLOOR_Y);
+    cone.addColorStop(0, glow);
+    cone.addColorStop(1, "rgba(0, 0, 0, 0)");
+    ctx.fillStyle = cone;
+    ctx.fillRect(cx - 12, y + 6, 24, FLOOR_Y - y - 6);
   }
 }
 

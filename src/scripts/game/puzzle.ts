@@ -7,8 +7,14 @@ import { isHeavy, type RobotForm } from "./forms";
  * so the rules can be tested without a canvas.
  */
 
-/** Shallow water at the start of the level, to the left of where the robot wakes up. */
-export const PUDDLE: Rect = { x: 14, y: 121, width: 28, height: 7 };
+/**
+ * Shallow water, spilled on the low shelf right by where the robot wakes up.
+ * It sits off the floor deliberately: walking right along the ground takes you
+ * over the pressure plate first, so you watch it refuse your weight before you
+ * ever find the water. One easy hop up is the whole lesson, and no text is
+ * needed to join it up.
+ */
+export const PUDDLE: Rect = { x: 58, y: 91, width: 28, height: 7 };
 
 /**
  * The plate is a trigger pad, not a collider. Collision resolution has no
@@ -16,13 +22,13 @@ export const PUDDLE: Rect = { x: 14, y: 121, width: 28, height: 7 };
  * (and trap it on the way back). It sits almost flush and depresses under the
  * robot instead of lifting it.
  */
-export const PLATE_X = 100;
-export const PLATE_WIDTH = 44;
+export const PLATE_X = 96;
+export const PLATE_WIDTH = 48;
 export const PLATE_TOP = 126;
 export const PLATE_TRAVEL = 2;
 
 /** Portcullis. The beam above it is a static platform, so together they seal the doorway. */
-export const GATE: Rect = { x: 178, y: 48, width: 16, height: 80 };
+export const GATE: Rect = { x: 170, y: 48, width: 16, height: 80 };
 
 /** Seconds for the signal to travel the conduit from plate to gate. */
 const SIGNAL_TRAVEL = 0.38;

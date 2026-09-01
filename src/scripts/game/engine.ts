@@ -112,7 +112,9 @@ export function startGame(canvas: HTMLCanvasElement): void {
   canvas.height = CANVAS_HEIGHT;
 
   const input = new InputTracker();
-  const robot = createRobot(60, FLOOR_TOP - 14);
+  // Wakes up left of everything, so walking right meets the plate before the
+  // water: you see it refuse your weight before you know what to do about it.
+  const robot = createRobot(14, FLOOR_TOP - 14);
   const puzzle = createPuzzle();
   const droplets = new Droplets();
 
@@ -130,7 +132,13 @@ export function startGame(canvas: HTMLCanvasElement): void {
     if (events.absorbed) {
       setRobotForm(robot, "water");
       // The puddle leaps up into the robot.
-      droplets.burst(PUDDLE.x + PUDDLE.width / 2, FLOOR_TOP - 2, 22, 78, PUDDLE.width * 0.8);
+      droplets.burst(
+        PUDDLE.x + PUDDLE.width / 2,
+        PUDDLE.y + PUDDLE.height - 2,
+        22,
+        78,
+        PUDDLE.width * 0.8,
+      );
     }
     if (events.latched) {
       droplets.burst(robot.x + robot.width / 2, robot.y + robot.height - 1, 10, 46, robot.width);
@@ -161,7 +169,7 @@ export function startGame(canvas: HTMLCanvasElement): void {
       const spread = PUDDLE.width * 0.4 * puzzle.puddleAmount;
       droplets.drip(
         PUDDLE.x + PUDDLE.width / 2 + (Math.random() - 0.5) * spread * 2,
-        FLOOR_TOP - 3,
+        PUDDLE.y + PUDDLE.height - 3,
       );
     }
 

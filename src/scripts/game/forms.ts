@@ -4,9 +4,11 @@
  * point — the pressure plate only answers to weight.
  *
  * Tuning note: max jump height is v^2 / (2g), so the water form clears
- * 195^2/1040 = 36.6px against the dry form's 210^2/960 = 45.9px. Every jump
- * the puzzle *requires* is kept under 36px; the taller platforms are dry-form
- * flourishes, not the critical path.
+ * 206^2/1040 = 40.8px against the dry form's 210^2/960 = 45.9px — a tenth
+ * lower, not a different game. Every climb in the level is sized so BOTH
+ * forms clear it with margin to spare; `spec/puzzle.test.ts` asserts it.
+ * The weight is felt in the slower walk and the harder fall, not in being
+ * locked out of the level.
  */
 export type RobotForm = "dry" | "water";
 
@@ -37,7 +39,7 @@ export const FORMS: Record<RobotForm, FormSpec> = {
     width: 16,
     height: 18,
     moveSpeed: 52,
-    jumpVelocity: -195,
+    jumpVelocity: -206,
     gravity: 520,
     friction: 0.74,
     mass: 3,

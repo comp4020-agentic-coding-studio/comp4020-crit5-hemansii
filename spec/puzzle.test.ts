@@ -42,7 +42,7 @@ function run(state: PuzzleState, b: ReturnType<typeof body>, seconds: number) {
 describe("absorbing the puddle", () => {
   it("triggers when the dry robot walks into the water", () => {
     const state = createPuzzle();
-    const b = body("dry", PUDDLE.x + 4, FLOOR_TOP);
+    const b = body("dry", PUDDLE.x + 4, PUDDLE.y + PUDDLE.height);
 
     expect(canAbsorb(b, state)).toBe(true);
   });
@@ -56,7 +56,7 @@ describe("absorbing the puddle", () => {
 
   it("cannot be absorbed twice: the puddle drains and stays drained", () => {
     const state = createPuzzle();
-    const b = body("dry", PUDDLE.x + 4, FLOOR_TOP);
+    const b = body("dry", PUDDLE.x + 4, PUDDLE.y + PUDDLE.height);
 
     const first = run(state, b, 1.5);
     expect(first.absorbed).toBe(true);
@@ -68,7 +68,7 @@ describe("absorbing the puddle", () => {
 
   it("is not offered to a robot that is already water", () => {
     const state = createPuzzle();
-    const b = body("water", PUDDLE.x + 4, FLOOR_TOP);
+    const b = body("water", PUDDLE.x + 4, PUDDLE.y + PUDDLE.height);
 
     expect(canAbsorb(b, state)).toBe(false);
   });
@@ -190,21 +190,55 @@ describe("form tuning", () => {
     expect(FORMS.water.height).toBeGreaterThan(FORMS.dry.height);
   });
 
-  /**
-   * The puzzle is only solvable if the heavy form can still climb the steps
-   * behind the gate. This pins that down against future tuning.
-   */
-  it("leaves the water form able to climb everything the puzzle requires", () => {
-    const step = platforms.find((p) => p.x === 206)!;
-    const ledge = platforms.find((p) => p.x === 224)!;
+  it("keeps the water form's jump only slightly lower, not crippled", () => {
+    const ratio = maxJumpHeight("water") / maxJumpHeight("dry");
+    expect(ratio).toBeGreaterThan(0.8);
+    expect(ratio).toBeLessThan(0.95);
+  });
+});
 
-    const ontoStep = FLOOR_TOP - step.y;
-    const ontoLedge = step.y - ledge.y;
+/**
+ * Reachability. Every climb the level offers is listed here by the platforms
+ * it runs between, and asserted to be comfortably inside BOTH forms' jump
+ * height — comfortably meaning a real margin, not a pixel-perfect launch.
+ * This is the guard against "some of the platforms are too high to reach".
+ */
+describe("every platform is reachable", () => {
+  const MARGIN = 6;
 
-    expect(ontoStep).toBeGreaterThan(0);
-    expect(ontoLedge).toBeGreaterThan(0);
-    expect(maxJumpHeight("water")).toBeGreaterThan(ontoStep + 4);
-    expect(maxJumpHeight("water")).toBeGreaterThan(ontoLedge + 4);
+  const top = (x: number) => {
+    const p = platforms.find((q) => q.x === x);
+    expect(p, `expected a platform at x=${x}`).toBeDefined();
+    return p!.y;
+  };
+
+  const maxJumpHeight = (form: RobotForm) => {
+    const { jumpVelocity, gravity } = FORMS[form];
+    return (jumpVelocity * jumpVelocity) / (2 * gravity);
+  };
+
+  const CLIMBS: Array<[string, number, number]> = [
+    ["floor onto the puddle shelf", FLOOR_TOP, top(52)],
+    ["shelf onto the upper platform", top(52), top(104)],
+    ["upper onto the top platform", top(104), top(72)],
+    ["floor onto the step behind the gate", FLOOR_TOP, top(196)],
+    ["step onto the reward ledge", top(196), top(224)],
+  ];
+
+  it.each(CLIMBS)("%s is within both forms' reach", (_name, from, to) => {
+    const rise = from - to;
+    expect(rise).toBeGreaterThan(0);
+    expect(maxJumpHeight("dry")).toBeGreaterThan(rise + MARGIN);
+    expect(maxJumpHeight("water")).toBeGreaterThan(rise + MARGIN);
+  });
+
+  it("leaves the heavy form room to walk under the puddle shelf", () => {
+    const shelf = platforms.find((p) => p.x === 52)!;
+    const headroom = FLOOR_TOP - FORMS.water.height;
+
+    // A 16px-thick shelf low enough to jump onto would be too low to duck
+    // under; the thin shelf is what makes both true at once.
+    expect(shelf.y + shelf.height).toBeLessThan(headroom);
   });
 });
 
@@ -238,8 +272,22 @@ describe("geometry helpers", () => {
     expect(rectsOverlap(a, { x: 0, y: 10, width: 10, height: 10 })).toBe(false);
   });
 
-  it("puts the puddle and the plate on the floor, not floating above it", () => {
-    expect(PUDDLE.y + PUDDLE.height).toBe(FLOOR_TOP);
+  it("rests the puddle on a real surface rather than floating it", () => {
+    const shelf = platforms.find(
+      (p) =>
+        PUDDLE.y + PUDDLE.height === p.y &&
+        PUDDLE.x >= p.x &&
+        PUDDLE.x + PUDDLE.width <= p.x + p.width,
+    );
+    expect(shelf, "the puddle should sit on top of a platform").toBeDefined();
+  });
+
+  it("puts the puddle off the floor, so the plate is met first walking right", () => {
+    expect(PUDDLE.y + PUDDLE.height).toBeLessThan(FLOOR_TOP);
+    expect(PUDDLE.x).toBeLessThan(PLATE_X);
+  });
+
+  it("runs the plate along the floor, upstream of the gate it drives", () => {
     expect(PLATE_TOP).toBeLessThan(FLOOR_TOP);
     expect(PLATE_X + PLATE_WIDTH).toBeLessThan(GATE.x);
   });

@@ -284,11 +284,14 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
     sparks.update(dt);
     time += dt;
 
+    // Always stepped, never gated: confetti that stops updating does not
+    // disappear, it hangs in the air. Only the raining is conditional.
+    confetti.update(dt, CANVAS_HEIGHT);
+
     if (complete) {
       // Keep it raining, and let the robot bounce on the spot. The controls stay
       // live, so you can still walk about in the mess you made.
       if (Math.random() < dt * 22) confetti.rain(CANVAS_WIDTH, 1);
-      confetti.update(dt, CANVAS_HEIGHT);
       hopTimer += dt;
       if (hopTimer >= HOP_INTERVAL && robot.grounded) {
         hopTimer = 0;
@@ -410,6 +413,8 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
     wipe = 0;
     complete = false;
     hopTimer = 0;
+    // A fresh level starts clean: no leftover celebration from the last one.
+    confetti.clear();
     publish();
   }
 

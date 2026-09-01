@@ -201,6 +201,10 @@ export class Confetti {
     return this.items.length;
   }
 
+  clear(): void {
+    this.items.length = 0;
+  }
+
   /** Drops `count` flecks from above the top of the screen, spread across `width`. */
   rain(width: number, count: number): void {
     for (let i = 0; i < count; i++) {

@@ -231,3 +231,93 @@ export const TOY_ROCKET_GRID = sprite([
   "155322224551",
   "114322224411",
 ]);
+
+// 14x16 charged form: the same chassis as the dry robot, but the visor is
+// running hot, the antenna has a spark sitting on it, and a bolt is burning
+// through the chest plate. Same 12x14 hitbox as the dry form.
+export const ELECTRIC_ROBOT_GRID = sprite([
+  ".....989......",
+  "......8.......",
+  "..1111111111..",
+  "..1333222221..",
+  "..1266666621..",
+  "..1267776621..",
+  "..1266666621..",
+  "..1222222221..",
+  "..1111111111..",
+  ".132222882241.",
+  "14132288222141",
+  "14122888822141",
+  "14122228822141",
+  ".144444444441.",
+  "..1221..1221..",
+  "..1441..1441..",
+]);
+
+// 10x20 toy D-cell, standing on its base: raised terminal, steel caps top and
+// bottom, and a bolt printed on the wrapper so it reads as a power source and
+// not a tin of paint.
+export const BATTERY_GRID = sprite([
+  "...1111...",
+  "...1651...",
+  "1111111111",
+  "1665555551",
+  "1555555571",
+  "1111111111",
+  "1332222441",
+  "1332222441",
+  "1332288441",
+  "1332882441",
+  "1338888441",
+  "1332288441",
+  "1332222441",
+  "1332222441",
+  "1332222441",
+  "1332222441",
+  "1332222441",
+  "1111111111",
+  "1555555571",
+  "1111111111",
+]);
+
+// 24x26 toy locomotive, facing left: chimney and headlamp at the front, saddle
+// tank amidships, cab with a window at the back, three wheels riding the rail.
+//
+// Chimney, tank and cab roof are deliberately all the SAME height, so row 0 is
+// one unbroken line across the whole engine. That is not a styling choice: the
+// roof is a platform, and the robot stands at its collider's top edge. A taller
+// chimney over a lower boiler would leave the robot visibly floating above
+// whichever part of the roof it happened to be standing on. `spec/sprites.test.ts`
+// asserts the roofline holds. The headlamp lens (LAMP_LENS) is painted over when
+// it lights.
+export const TRAIN_GRID = sprite([
+  "..111111111111111111111.",
+  "..166611555115555555551.",
+  "..166611555114222222241.",
+  "..166611222114188888141.",
+  "..166611222114188888141.",
+  "..166611222114222222241.",
+  "..166611222114222222241.",
+  ".1111111111114222222241.",
+  ".1322222224114222222241.",
+  ".1322222224114222222241.",
+  ".1555222224114222222241.",
+  ".1599222224114222222241.",
+  ".1599222224114222222241.",
+  ".1555222224114222222241.",
+  ".1325522224114222222241.",
+  ".1322222224114222222241.",
+  ".1322222224114222222241.",
+  ".1111111111111111111111.",
+  "177777777777777777777771",
+  "166666666666666666666661",
+  "..1111...1111...1111....",
+  ".166661.166661.166661...",
+  ".165561.165561.165561...",
+  ".165561.165561.165561...",
+  ".166661.166661.166661...",
+  "..1111...1111...1111....",
+]);
+
+/** Where the headlamp's lens sits inside TRAIN_GRID, so it can be lit in place. */
+export const LAMP_LENS = { dx: 3, dy: 11, width: 2, height: 2 };

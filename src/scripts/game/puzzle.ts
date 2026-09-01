@@ -1,4 +1,4 @@
-import type { Rect } from "./physics";
+import { rectsOverlap, type Rect } from "./physics";
 import { isHeavy, type RobotForm } from "./forms";
 
 /**
@@ -70,15 +70,6 @@ export function createPuzzle(): PuzzleState {
     signal: 0,
     gateOpenness: 0,
   };
-}
-
-export function rectsOverlap(a: Rect, b: Rect): boolean {
-  return (
-    a.x < b.x + b.width &&
-    a.x + a.width > b.x &&
-    a.y < b.y + b.height &&
-    a.y + a.height > b.y
-  );
 }
 
 /** Where the plate's top surface currently sits. */

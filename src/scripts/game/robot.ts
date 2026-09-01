@@ -7,7 +7,7 @@ import {
   resolveVerticalCollision,
   type Rect,
 } from "./physics";
-import type { InputTracker } from "./input";
+import type { Controls } from "./input";
 
 export interface Robot {
   x: number;
@@ -23,8 +23,8 @@ export interface Robot {
   sinceLanded: number;
   /** How hard that landing was, 0..1. */
   landingImpact: number;
-  /** Counts up while in water form, so drips can be spaced out. */
-  dripTimer: number;
+  /** Counts up always, so whichever form is active can space out its effects. */
+  effectTimer: number;
 }
 
 export function createRobot(x: number, y: number, form: RobotForm = "dry"): Robot {
@@ -41,13 +41,15 @@ export function createRobot(x: number, y: number, form: RobotForm = "dry"): Robo
     form,
     sinceLanded: 999,
     landingImpact: 0,
-    dripTimer: 0,
+    effectTimer: 0,
   };
 }
 
 /**
- * Swaps form in place. The robot grows about its feet and its centre line, so
- * absorbing water never shoves it into the floor or off to one side.
+ * Swaps form in place — replacing whatever was held, never adding to it. The
+ * robot grows and shrinks about its feet and its centre line, so absorbing
+ * water never shoves it into the floor, and the smaller charged form does not
+ * pop into the air when the water goes.
  */
 export function setRobotForm(robot: Robot, form: RobotForm): void {
   const spec = FORMS[form];
@@ -63,7 +65,7 @@ export function setRobotForm(robot: Robot, form: RobotForm): void {
 
 export function updateRobot(
   robot: Robot,
-  input: InputTracker,
+  input: Controls,
   dt: number,
   platforms: Rect[],
 ): void {
@@ -113,5 +115,5 @@ export function updateRobot(
     robot.sinceLanded += dt;
   }
 
-  robot.dripTimer += dt;
+  robot.effectTimer += dt;
 }

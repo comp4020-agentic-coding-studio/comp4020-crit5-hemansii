@@ -10,7 +10,8 @@
     "typecheck": "astro check",
     "check": "pnpm typecheck && pnpm build && vitest run",
     "check:evidence": "node scripts/check-evidence.ts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "shots": "vitest run --config tools/preview/vitest.config.ts"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.10",

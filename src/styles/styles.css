@@ -1,29 +1,219 @@
+:root {
+  --ink: #eee6f5;
+  --dim: #a294bd;
+  --panel: #1d1430;
+  --edge: #33244f;
+  --amber: #ffe24a;
+  --green: #8fe3b0;
+  --pixel: "Press Start 2P", ui-monospace, "Courier New", monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* The page is exactly the viewport: the game is the content, and a scrollbar
+   next to a fixed-size canvas is just noise. */
+html,
 body {
+  height: 100%;
   margin: 0;
-  padding: 2rem;
-  font-family: system-ui, sans-serif;
+  overflow: hidden;
+}
+
+body {
+  /* Pixel type throughout. It is wide and it has no lower-case rhythm, so every
+     size below is set small and every line given room to breathe. */
+  font-family: var(--pixel);
+  font-size: 0.62rem;
+  line-height: 1.9;
+  color: var(--ink);
+  background: #120c1d;
+}
+
+.shell {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+}
+
+/* ------------------------------------------------------------------ sidebar */
+
+.sidebar {
+  flex: 0 0 16rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 1.5rem 1.1rem;
+  overflow-y: auto;
+  background: var(--panel);
+  border-right: 1px solid var(--edge);
+}
+
+.brand {
+  margin: 0;
+  font-size: 1.6rem;
+  line-height: 1.35;
+  color: var(--amber);
+  /* Hard offset shadow rather than a blur, so the letters stay pixel-crisp. */
+  text-shadow:
+    3px 3px 0 #7a3b1e,
+    6px 6px 0 rgba(0, 0, 0, 0.5);
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+  margin: 0;
+}
+
+.blurb {
+  margin: -0.5rem 0 0;
+  font-size: 0.55rem;
+  line-height: 2.1;
+  color: var(--dim);
+}
+
+.keys {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin: 0;
+  padding: 0;
+  font-size: 0.62rem;
   line-height: 1.6;
-  color: #eee6f5;
-  background: #171022;
-  min-height: 100vh;
+  color: var(--dim);
+  list-style: none;
+}
+
+/* The key itself, as a cap you can read at a glance. */
+.keys span {
+  display: inline-block;
+  min-width: 4.6rem;
+  margin-right: 0.5rem;
+  padding: 0.35rem 0.4rem;
+  font-size: 0.58rem;
+  color: var(--amber);
   text-align: center;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--edge);
+  border-radius: 3px;
 }
 
-main {
-  max-width: 40rem;
-  margin: 0 auto;
+.tally {
+  margin: auto 0 0;
+  font-size: 0.55rem;
+  color: var(--dim);
 }
 
-h1 {
-  margin: 0 0 1rem;
-  letter-spacing: 0.05em;
+.tally span {
+  font-size: 0.75rem;
+  color: var(--green);
+}
+
+/* ------------------------------------------------------------------- levels */
+
+.levels {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.level-button {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  width: 100%;
+  padding: 0.6rem;
+  font: inherit;
+  text-align: left;
+  color: var(--ink);
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--edge);
+  border-radius: 4px;
+}
+
+/* Big enough to read as a state at a glance: the small tick was unreadable. */
+.level-mark {
+  display: grid;
+  flex: 0 0 2.1rem;
+  place-items: center;
+  height: 2.1rem;
+  padding-bottom: 4px;
+  font-size: 1.15rem;
+  line-height: 1;
+  color: var(--dim);
+  border: 2px solid var(--edge);
+  border-radius: 4px;
+}
+
+.level-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
+.level-n {
+  font-size: 0.62rem;
+  line-height: 1;
+}
+
+.level-name {
+  overflow: hidden;
+  font-size: 0.5rem;
+  line-height: 1.3;
+  color: var(--dim);
+}
+
+.level.is-current .level-button {
+  border-color: var(--amber);
+  background: rgba(255, 226, 74, 0.1);
+}
+
+.level.is-current .level-mark {
+  color: #201634;
+  background: var(--amber);
+  border-color: var(--amber);
+}
+
+.level.is-done .level-mark {
+  color: #16301f;
+  background: var(--green);
+  border-color: var(--green);
+}
+
+.level.is-locked .level-button {
+  cursor: default;
+  opacity: 0.4;
+}
+
+/* -------------------------------------------------------------------- stage */
+
+.stage {
+  display: grid;
+  flex: 1;
+  place-items: center;
+  min-width: 0;
+  padding: 1.5rem;
+}
+
+/* The buttons live on the toybox itself, so the frame is what they sit in. */
+.screen {
+  position: relative;
+  width: min(100%, calc((100vh - 3rem) * 256 / 144));
+  aspect-ratio: 256 / 144;
 }
 
 #game {
   display: block;
-  width: min(100%, 768px);
-  margin: 0 auto;
-  aspect-ratio: 256 / 144;
+  width: 100%;
+  height: 100%;
   image-rendering: pixelated;
   image-rendering: -moz-crisp-edges;
   background: #241a38;
@@ -32,6 +222,70 @@ h1 {
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
 }
 
-a {
-  color: #9fdfff;
+.overlay {
+  position: absolute;
+  inset: 3px;
+  display: grid;
+  gap: 0.75rem;
+  place-content: center;
+  border-radius: 2px;
+}
+
+.overlay[hidden] {
+  display: none;
+}
+
+/* Dim the room behind the button only while paused; dimming the finish would
+   hide the confetti it is congratulating you for. */
+.overlay.is-dim {
+  background: rgba(12, 8, 26, 0.62);
+}
+
+.primary {
+  padding: 0.9rem 1.4rem;
+  font: inherit;
+  font-size: 0.8rem;
+  color: #201634;
+  cursor: pointer;
+  background: var(--green);
+  border: 0;
+  border-bottom: 4px solid #4e8f6a;
+  border-radius: 4px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+}
+
+.primary:hover {
+  filter: brightness(1.08);
+}
+
+.primary:active {
+  transform: translateY(2px);
+  border-bottom-width: 2px;
+}
+
+.replay {
+  background: var(--amber);
+  border-bottom-color: #a8871f;
+}
+
+@media (max-width: 48rem) {
+  html,
+  body {
+    overflow: auto;
+  }
+
+  .shell {
+    flex-direction: column;
+    height: auto;
+  }
+
+  .sidebar {
+    flex: none;
+    border-right: 0;
+    border-bottom: 1px solid var(--edge);
+  }
+
+  .screen {
+    width: 100%;
+  }
 }

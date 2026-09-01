@@ -1,15 +1,16 @@
 ---
 import "../styles/styles.css";
+import { LEVELS } from "../scripts/game/levels";
 ---
 <!doctype html>
 <html lang="en-AU">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Sponge</title>
+    <title>Spongebot</title>
     <meta
       name="description"
-      content="A small toybox platformer starring a sponge robot."
+      content="Spongebot: a sponge robot absorbs water and electricity to solve three toybox puzzles."
     />
 
     <!--
@@ -21,17 +22,57 @@ import "../styles/styles.css";
     <meta property="og:image" content="./card.png" />
     <meta name="twitter:card" content="summary_large_image" />
 
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap"
+      rel="stylesheet"
+    />
   </head>
   <body>
-    <header>
-      <nav aria-label="Primary">
-        <a href="./">Home</a>
+    <div class="shell">
+      <nav class="sidebar" aria-label="Primary">
+        <h1 class="brand">Spongebot</h1>
+        <p class="blurb">
+          A sponge robot in a toybox. Absorb water to get heavy, absorb
+          electricity to get charged &mdash; but only one at a time.
+        </p>
+
+        <section class="panel">
+          <ol id="level-list" class="levels">
+            {
+              LEVELS.map((level, i) => (
+                <li class="level" data-level={i}>
+                  <button class="level-button">
+                    <span class="level-mark" aria-hidden="true"></span>
+                    <span class="level-text">
+                      <span class="level-n">Level {i + 1}</span>
+                      <span class="level-name">{level.name}</span>
+                    </span>
+                  </button>
+                </li>
+              ))
+            }
+          </ol>
+        </section>
+
+        <ul class="keys">
+          <li><span>Arrows</span> move</li>
+          <li><span>Space</span> jump</li>
+        </ul>
+        <p class="tally"><span id="tally">0 / 3</span> levels done</p>
       </nav>
-    </header>
-    <main>
-      <h1>Sponge</h1>
-      <canvas id="game" width="256" height="144"></canvas>
-    </main>
+
+      <main class="stage">
+        <div class="screen">
+          <canvas id="game" width="256" height="144"></canvas>
+          <div id="overlay" class="overlay">
+            <button id="play" class="primary">Play</button>
+            <button id="replay" class="primary replay" hidden>Replay</button>
+          </div>
+        </div>
+      </main>
+    </div>
     <script src="../scripts/main.ts"></script>
   </body>
 </html>

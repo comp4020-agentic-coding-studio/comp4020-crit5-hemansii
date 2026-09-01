@@ -1,13 +1,12 @@
 import {
   CANVAS_WIDTH,
   CANVAS_HEIGHT,
+  BATTERY_PALETTE,
+  BATTERY_SPENT_PALETTE,
+  CIRCUIT_PALETTE,
   PLATFORM_PALETTE,
   PUZZLE_PALETTE,
-  TOY_BALL_PALETTE,
-  TOY_BLOCK_PALETTE,
-  TOY_PLUSH_PALETTE,
-  TOY_ROCKET_PALETTE,
-  type Palette,
+  TRAIN_PALETTE,
 } from "./constants";
 import type { Rect } from "./physics";
 import {
@@ -20,14 +19,23 @@ import {
   type PuzzleState,
 } from "./puzzle";
 import {
+  RAIL_END,
+  TRAIN_TOP,
+  TRAIN_WIDTH,
+  TUNNEL_MOUTH,
+  TUNNEL_WALL,
+  trainRect,
+  type CircuitState,
+} from "./circuit";
+import type { Toy } from "./levels";
+import {
+  BATTERY_GRID,
   drawPixelGrid,
   drawSilhouette,
+  LAMP_LENS,
   PLATFORM_TILE,
-  TOY_BALL_GRID,
-  TOY_BLOCK_GRID,
+  TRAIN_GRID,
   TOY_PLUSH_GRID,
-  TOY_ROCKET_GRID,
-  type SpriteGrid,
 } from "./sprites";
 
 const TILE_SIZE = 16;
@@ -37,40 +45,6 @@ const FLOOR_Y = CANVAS_HEIGHT - TILE_SIZE;
 const LIGHT_X = 58;
 const SHADOW = "rgba(14, 8, 28, 0.30)";
 const CONTACT_SHADOW = "rgba(14, 8, 28, 0.42)";
-
-export interface Toy {
-  x: number;
-  y: number;
-  grid: SpriteGrid;
-  palette: Palette;
-}
-
-/** Thin shelves, 8px rather than a full block. */
-const SHELF = 8;
-
-/**
- * Level layout. Every climb is sized so BOTH forms clear it with room to spare
- * (see spec/puzzle.test.ts) — no platform needs a pixel-perfect jump. The
- * shelves are thin for the same reason: a 16px block low enough for the heavy
- * form to jump onto is too low for it to walk beneath, and 8px resolves that.
- */
-export const platforms: Rect[] = [
-  { x: 0, y: FLOOR_Y, width: CANVAS_WIDTH, height: TILE_SIZE }, // floor
-  { x: 52, y: 98, width: 44, height: SHELF }, // the puddle shelf
-  { x: 104, y: 68, width: 36, height: SHELF },
-  { x: 72, y: 40, width: 32, height: SHELF },
-  { x: 170, y: 0, width: 16, height: 48 }, // door beam; seals the top of the gateway
-  { x: 196, y: 112, width: 16, height: TILE_SIZE }, // step, behind the gate
-  { x: 224, y: 92, width: 32, height: TILE_SIZE }, // reward ledge
-];
-
-export const toys: Toy[] = [
-  { x: 80, y: 22, grid: TOY_BLOCK_GRID, palette: TOY_BLOCK_PALETTE },
-  { x: 112, y: 54, grid: TOY_PLUSH_GRID, palette: TOY_PLUSH_PALETTE },
-  { x: 150, y: 114, grid: TOY_BALL_GRID, palette: TOY_BALL_PALETTE },
-  { x: 197, y: 98, grid: TOY_BALL_GRID, palette: TOY_BALL_PALETTE },
-  { x: 232, y: 76, grid: TOY_ROCKET_GRID, palette: TOY_ROCKET_PALETTE },
-];
 
 // ---------------------------------------------------------------- primitives
 
@@ -294,7 +268,7 @@ export function drawDoorway(ctx: CanvasRenderingContext2D): void {
 
 // ---------------------------------------------------------------- platforms
 
-export function drawPlatforms(ctx: CanvasRenderingContext2D): void {
+export function drawPlatforms(ctx: CanvasRenderingContext2D, platforms: Rect[]): void {
   for (const platform of platforms) {
     const isFloor = platform.y >= FLOOR_Y;
 
@@ -549,9 +523,306 @@ export function drawGate(ctx: CanvasRenderingContext2D, state: PuzzleState): voi
   ctx.restore();
 }
 
+// ---------------------------------------------------------- electric puzzle
+
+/**
+ * The dark inside the tunnel, drawn before the locomotive so it sits in shadow
+ * while it is still asleep. `drawTunnelShade` puts the same dark back over the
+ * top afterwards, which is what makes driving out read as coming into the light.
+ */
+export function drawTunnelInterior(ctx: CanvasRenderingContext2D): void {
+  ctx.fillStyle = CIRCUIT_PALETTE.tunnel;
+  ctx.fillRect(TUNNEL_MOUTH.x, TUNNEL_MOUTH.y, TUNNEL_MOUTH.width, TUNNEL_MOUTH.height);
+
+  // A wooden arch around the mouth, so the recess reads as a built tunnel and
+  // not a hole where the wall failed to draw. Lit on its leading edge, because
+  // the mouth is the one part of it facing the room.
+  const { x, y, width, height } = TUNNEL_MOUTH;
+  ctx.fillStyle = PLATFORM_PALETTE[1];
+  ctx.fillRect(x, y, 3, height);
+  ctx.fillRect(x, y, width, 3);
+  ctx.fillStyle = CIRCUIT_PALETTE.tunnelArch;
+  ctx.fillRect(x, y, 2, height);
+  ctx.fillRect(x, y, width, 2);
+  ctx.fillStyle = PLATFORM_PALETTE[6];
+  ctx.fillRect(x, y, 1, height - 1);
+  ctx.fillRect(x, y, width, 1);
+
+  // Keystone blocks along the arch, so it reads as built rather than extruded.
+  ctx.fillStyle = PLATFORM_PALETTE[5];
+  for (let bx = x + 4; bx < x + width; bx += 6) ctx.fillRect(bx, y, 1, 2);
+}
+
+export function drawTunnelShade(ctx: CanvasRenderingContext2D): void {
+  const shade = ctx.createLinearGradient(
+    TUNNEL_MOUTH.x,
+    0,
+    TUNNEL_MOUTH.x + TUNNEL_MOUTH.width,
+    0,
+  );
+  // Light enough that the sleeping locomotive is plainly a locomotive: it has to
+  // be recognisable from across the room for touching it to be an obvious move.
+  shade.addColorStop(0, "rgba(11, 8, 24, 0.06)");
+  shade.addColorStop(1, "rgba(11, 8, 24, 0.46)");
+  ctx.fillStyle = shade;
+  ctx.fillRect(TUNNEL_MOUTH.x + 2, TUNNEL_MOUTH.y + 2, TUNNEL_MOUTH.width - 2, TUNNEL_MOUTH.height - 2);
+}
+
+/**
+ * The rail. Dead grey until the robot hands its charge over, then the discharge
+ * spreads outwards from the contact along it — the same "you can see the cause
+ * travel to the effect" trick the pressure plate's conduit uses, so the second
+ * puzzle speaks a language the first one already taught.
+ */
+export function drawRail(
+  ctx: CanvasRenderingContext2D,
+  state: CircuitState,
+  time: number,
+): void {
+  const headY = FLOOR_Y - 4;
+  const bedY = FLOOR_Y - 3;
+  const railX = state.config.railX;
+  const span = RAIL_END - railX;
+  const lit = state.powered;
+
+  // Ballast, then sleepers across it, then the rail head sitting on top. Three
+  // bands of 1px each is all the depth there is room for, and it is enough:
+  // without the sleepers the rail read as a wire lying on the floorboards.
+  ctx.fillStyle = "rgba(20, 12, 8, 0.55)";
+  ctx.fillRect(railX, bedY, span, 3);
+  for (let x = railX; x < RAIL_END; x += 6) {
+    ctx.fillStyle = lit ? CIRCUIT_PALETTE.railTieLit : CIRCUIT_PALETTE.railTie;
+    ctx.fillRect(x, bedY, 4, 3);
+    ctx.fillStyle = "rgba(255, 226, 178, 0.14)";
+    ctx.fillRect(x, bedY, 4, 1);
+  }
+
+  ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+  ctx.fillRect(railX, headY + 1, span, 1);
+  ctx.fillStyle = CIRCUIT_PALETTE.railOff;
+  ctx.fillRect(railX, headY, span, 1);
+
+  if (!lit) return;
+
+  // The charge entered at the nose of the sleeping locomotive and spreads both
+  // ways from there.
+  const contact = TUNNEL_WALL.x + 2;
+  const left = contact - (contact - railX) * state.arc;
+  const right = contact + (RAIL_END - contact) * state.arc;
+  ctx.fillStyle = CIRCUIT_PALETTE.railOn;
+  ctx.fillRect(Math.round(left), headY, Math.round(right - left), 1);
+
+  if (state.arc < 1) {
+    ctx.fillStyle = CIRCUIT_PALETTE.lampCore;
+    ctx.fillRect(Math.round(left), headY - 1, 2, 3);
+  } else {
+    // Live rail: a bright pixel running along it, and a haze over the sleepers.
+    const p = (time * 0.7) % 1;
+    ctx.fillStyle = CIRCUIT_PALETTE.railGlow;
+    ctx.fillRect(Math.round(railX + span * p), headY - 1, 2, 2);
+    const haze = ctx.createLinearGradient(0, headY - 7, 0, headY + 2);
+    haze.addColorStop(0, "rgba(255, 226, 74, 0)");
+    haze.addColorStop(1, "rgba(255, 226, 74, 0.18)");
+    ctx.fillStyle = haze;
+    ctx.fillRect(railX, headY - 7, span, 9);
+  }
+}
+
+/**
+ * The battery. Crackling between its terminals while it holds a charge, dull
+ * grey once the robot has taken it — the same object, in two states, so the
+ * player can see at a glance that this one is spent.
+ */
+export function drawBattery(
+  ctx: CanvasRenderingContext2D,
+  state: CircuitState,
+  time: number,
+): void {
+  const battery = state.config.battery;
+  const charge = state.batteryCharge;
+  const spent = charge <= 0.02;
+  const palette = spent ? BATTERY_SPENT_PALETTE : BATTERY_PALETTE;
+
+  fillEllipse(ctx, battery.x + battery.width / 2 + 1, battery.y + battery.height - 1, 6, 2, CONTACT_SHADOW);
+
+  if (!spent) {
+    const pulse = 0.16 + Math.abs(Math.sin(time * 3.1)) * 0.2 * charge;
+    const cx = battery.x + battery.width / 2;
+    const glow = ctx.createRadialGradient(cx, battery.y + 6, 1, cx, battery.y + 6, 18);
+    glow.addColorStop(0, `rgba(255, 226, 74, ${pulse})`);
+    glow.addColorStop(1, "rgba(255, 226, 74, 0)");
+    ctx.fillStyle = glow;
+    ctx.fillRect(cx - 18, battery.y - 12, 36, 36);
+  }
+
+  drawPixelGrid(ctx, BATTERY_GRID, palette, battery.x, battery.y, 1);
+
+  if (spent) return;
+
+  // Arcs skipping off the terminal. Deterministic from `time`, so it flickers
+  // rather than strobes, and never lands on the same pixel two frames running.
+  const cx = battery.x + battery.width / 2;
+  for (let i = 0; i < 3; i++) {
+    const phase = time * 9 + i * 2.1;
+    if (Math.sin(phase * 1.7) < 0.2) continue;
+    const dx = Math.round(Math.sin(phase) * 3);
+    const dy = Math.round(-2 - Math.abs(Math.cos(phase * 1.3)) * 3);
+    ctx.fillStyle = i === 0 ? CIRCUIT_PALETTE.lampCore : BATTERY_PALETTE[9];
+    ctx.fillRect(cx + dx - 1, battery.y + dy, 1, 1);
+  }
+}
+
+/** The locomotive, and its headlamp once there is something to light it with. */
+export function drawTrain(
+  ctx: CanvasRenderingContext2D,
+  state: CircuitState,
+  time: number,
+): void {
+  const train = trainRect(state);
+  const x = Math.round(train.x);
+
+  fillEllipse(ctx, x + TRAIN_WIDTH / 2, FLOOR_Y - 1, TRAIN_WIDTH / 2 - 1, 2, CONTACT_SHADOW);
+  drawPixelGrid(ctx, TRAIN_GRID, TRAIN_PALETTE, x, TRAIN_TOP, 1);
+
+  if (!state.powered) return;
+
+  // Lamp lit, plus the beam it throws down the floor ahead of it.
+  const flicker = 0.75 + Math.sin(time * 11) * 0.25;
+  const lens = { x: x + LAMP_LENS.dx, y: TRAIN_TOP + LAMP_LENS.dy };
+  ctx.fillStyle = CIRCUIT_PALETTE.lampLit;
+  ctx.fillRect(lens.x, lens.y, LAMP_LENS.width, LAMP_LENS.height);
+  ctx.fillStyle = CIRCUIT_PALETTE.lampCore;
+  ctx.fillRect(lens.x, lens.y, 1, 1);
+
+  const beam = ctx.createLinearGradient(lens.x, 0, lens.x - 26, 0);
+  beam.addColorStop(0, `rgba(255, 246, 176, ${0.22 * flicker})`);
+  beam.addColorStop(1, "rgba(255, 246, 176, 0)");
+  ctx.fillStyle = beam;
+  ctx.fillRect(lens.x - 26, lens.y - 5, 26, 16);
+
+  const halo = ctx.createRadialGradient(lens.x + 1, lens.y + 1, 1, lens.x + 1, lens.y + 1, 9);
+  halo.addColorStop(0, `rgba(255, 246, 176, ${0.4 * flicker})`);
+  halo.addColorStop(1, "rgba(255, 246, 176, 0)");
+  ctx.fillStyle = halo;
+  ctx.fillRect(lens.x - 8, lens.y - 8, 18, 18);
+}
+
+/**
+ * The charged form's aura, drawn under the sprite. A radial glow plus a couple
+ * of arcs skipping across the hull: enough that the form reads as lit from
+ * inside at 1px scale, where a recoloured sprite alone would not.
+ */
+export function drawChargeAura(
+  ctx: CanvasRenderingContext2D,
+  body: Rect,
+  time: number,
+): void {
+  const cx = body.x + body.width / 2;
+  const cy = body.y + body.height / 2;
+  const pulse = 0.26 + Math.abs(Math.sin(time * 5.3)) * 0.16;
+
+  const glow = ctx.createRadialGradient(cx, cy, 1, cx, cy, 20);
+  glow.addColorStop(0, `rgba(255, 246, 176, ${pulse})`);
+  glow.addColorStop(0.45, `rgba(120, 226, 255, ${pulse * 0.5})`);
+  glow.addColorStop(1, "rgba(120, 226, 255, 0)");
+  ctx.fillStyle = glow;
+  ctx.fillRect(cx - 20, cy - 20, 40, 40);
+}
+
+/** Arcs crawling over the hull, drawn over the sprite so they read as on it. */
+export function drawChargeArcs(
+  ctx: CanvasRenderingContext2D,
+  body: Rect,
+  time: number,
+): void {
+  for (let i = 0; i < 4; i++) {
+    const phase = time * 7 + i * 1.9;
+    if (Math.sin(phase * 2.3) < 0.35) continue;
+    const t = (Math.sin(phase) + 1) / 2;
+    const along = i % 2 === 0;
+    const px = along
+      ? body.x + Math.round(t * body.width)
+      : body.x + (i === 1 ? -1 : body.width);
+    const py = along
+      ? body.y + (i === 0 ? -1 : body.height)
+      : body.y + Math.round(t * body.height);
+    ctx.fillStyle = i === 0 ? CIRCUIT_PALETTE.lampCore : CIRCUIT_PALETTE.railOn;
+    ctx.fillRect(px, py, 1, 1);
+  }
+}
+
+/**
+ * The way out. A lit archway, warm where the whole room is cool, and the only
+ * thing in the level that glows on its own — so "that is where I am going" needs
+ * no telling. Drawn after the platforms so it sits in the surface it stands on.
+ */
+export function drawExit(
+  ctx: CanvasRenderingContext2D,
+  exit: Rect,
+  time: number,
+): void {
+  const { x, y, width, height } = exit;
+  // Breathes, but never dims: at the bottom of a wider swing the doorway went
+  // dark enough to read as a hole in the wall rather than a way out of it.
+  const pulse = 0.88 + Math.sin(time * 2.4) * 0.12;
+
+  // Light thrown out into the room, so it reads as open air and not a painting.
+  const spill = ctx.createRadialGradient(
+    x + width / 2,
+    y + height / 2,
+    2,
+    x + width / 2,
+    y + height / 2,
+    26,
+  );
+  spill.addColorStop(0, `rgba(255, 224, 160, ${0.5 * pulse})`);
+  spill.addColorStop(1, "rgba(255, 224, 160, 0)");
+  ctx.fillStyle = spill;
+  ctx.fillRect(x + width / 2 - 26, y + height / 2 - 26, 52, 52);
+
+  // The opening is full of light. A dark hole would read as scenery; the one
+  // lit thing in a cool room reads as somewhere to go.
+  ctx.fillStyle = PUZZLE_PALETTE.doorway;
+  ctx.fillRect(x, y, width, height);
+  const depth = ctx.createLinearGradient(0, y, 0, y + height);
+  depth.addColorStop(0, `rgba(255, 250, 222, ${0.96 * pulse})`);
+  depth.addColorStop(0.55, `rgba(255, 220, 152, ${0.92 * pulse})`);
+  depth.addColorStop(1, `rgba(232, 168, 96, ${0.84 * pulse})`);
+  ctx.fillStyle = depth;
+  ctx.fillRect(x + 1, y + 1, width - 2, height - 1);
+
+  // A brighter core, so it has a shape rather than being a flat wash.
+  const core = ctx.createRadialGradient(
+    x + width / 2,
+    y + height * 0.62,
+    1,
+    x + width / 2,
+    y + height * 0.62,
+    width,
+  );
+  core.addColorStop(0, `rgba(255, 242, 196, ${0.35 * pulse})`);
+  core.addColorStop(1, "rgba(255, 242, 196, 0)");
+  ctx.fillStyle = core;
+  ctx.fillRect(x + 1, y + 1, width - 2, height - 1);
+
+  // Frame, lit down its left edge like everything else in the room.
+  ctx.fillStyle = PLATFORM_PALETTE[1];
+  ctx.fillRect(x - 2, y - 2, width + 4, 2);
+  ctx.fillRect(x - 2, y - 2, 2, height + 2);
+  ctx.fillRect(x + width, y - 2, 2, height + 2);
+  ctx.fillStyle = PLATFORM_PALETTE[3];
+  ctx.fillRect(x - 2, y - 2, width + 4, 1);
+  ctx.fillRect(x - 2, y - 2, 1, height + 2);
+  ctx.fillStyle = PLATFORM_PALETTE[6];
+  ctx.fillRect(x - 1, y - 2, width + 2, 1);
+
+  // A pool of light on the ground in front of the sill.
+  fillEllipse(ctx, x + width / 2, y + height - 1, width / 2 + 5, 3, `rgba(255, 214, 150, ${0.4 * pulse})`);
+}
+
 // --------------------------------------------------------------------- toys
 
-export function drawToys(ctx: CanvasRenderingContext2D): void {
+export function drawToys(ctx: CanvasRenderingContext2D, toys: Toy[]): void {
   for (const toy of toys) {
     const width = toy.grid[0].length;
     const height = toy.grid.length;

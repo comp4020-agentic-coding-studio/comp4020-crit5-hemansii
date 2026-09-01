@@ -2,7 +2,17 @@ const MOVE_LEFT_KEYS = new Set(["ArrowLeft", "a", "A"]);
 const MOVE_RIGHT_KEYS = new Set(["ArrowRight", "d", "D"]);
 const JUMP_KEYS = new Set(["ArrowUp", "w", "W", " "]);
 
-export class InputTracker {
+/**
+ * All the simulation asks of a controller. `InputTracker` is the keyboard
+ * implementation; `spec/playthrough.test.ts` drives the same surface from a
+ * script, which is what lets the level be played without a browser.
+ */
+export interface Controls {
+  readonly moveDirection: -1 | 0 | 1;
+  consumeJump(): boolean;
+}
+
+export class InputTracker implements Controls {
   private held = new Set<string>();
   private jumpQueued = false;
 

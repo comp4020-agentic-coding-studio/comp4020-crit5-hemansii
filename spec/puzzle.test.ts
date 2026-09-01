@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { FORMS, isHeavy, type RobotForm } from "../src/scripts/game/forms";
+import { FORMS, isHeavy, maxJumpHeight, type RobotForm } from "../src/scripts/game/forms";
+import { rectsOverlap } from "../src/scripts/game/physics";
 import { createRobot, setRobotForm } from "../src/scripts/game/robot";
 import {
   createPuzzle,
@@ -7,7 +8,6 @@ import {
   gateCollider,
   isOnPlate,
   plateTop,
-  rectsOverlap,
   updatePuzzle,
   GATE,
   PLATE_X,
@@ -16,7 +16,11 @@ import {
   PUDDLE,
   type PuzzleState,
 } from "../src/scripts/game/puzzle";
-import { platforms } from "../src/scripts/game/world";
+import { EXIT_SHELF, TRAIN_TOP } from "../src/scripts/game/circuit";
+import { LEVELS } from "../src/scripts/game/levels";
+
+/** Every form there is, so a new one cannot quietly skip the level's checks. */
+const ALL_FORMS = Object.keys(FORMS) as RobotForm[];
 
 const FLOOR_TOP = 128;
 
@@ -157,8 +161,8 @@ describe("the gate", () => {
     expect(gateCollider(state)).toBeNull();
   });
 
-  it("is sealed from ceiling to floor, so neither form can jump it", () => {
-    const beam = platforms.find((p) => p.x === GATE.x && p.y === 0);
+  it("is sealed from ceiling to floor, so no form can jump it", () => {
+    const beam = LEVELS[0].platforms.find((p) => p.x === GATE.x && p.y === 0);
     expect(beam, "a door beam should sit above the gate").toBeDefined();
 
     // beam runs from the ceiling down to the top of the portcullis...
@@ -172,11 +176,6 @@ describe("the gate", () => {
 });
 
 describe("form tuning", () => {
-  const maxJumpHeight = (form: RobotForm) => {
-    const { jumpVelocity, gravity } = FORMS[form];
-    return (jumpVelocity * jumpVelocity) / (2 * gravity);
-  };
-
   it("makes the water form heavier and slower, but not helpless", () => {
     expect(isHeavy("dry")).toBe(false);
     expect(isHeavy("water")).toBe(true);
@@ -203,37 +202,63 @@ describe("form tuning", () => {
  * height — comfortably meaning a real margin, not a pixel-perfect launch.
  * This is the guard against "some of the platforms are too high to reach".
  */
-describe("every platform is reachable", () => {
+describe("every climb the levels ask for is within reach", () => {
   const MARGIN = 6;
 
-  const top = (x: number) => {
-    const p = platforms.find((q) => q.x === x);
-    expect(p, `expected a platform at x=${x}`).toBeDefined();
-    return p!.y;
+  /**
+   * Each level's climbs, written out by the surfaces they run between. This is
+   * the guard against "some of the platforms are too high to reach", and it is
+   * listed rather than derived because which climbs a level *asks* for is a
+   * design fact, not something geometry can tell you.
+   */
+  const CLIMBS: Record<string, Array<[string, number, number]>> = {
+    Water: [
+      ["floor onto the puddle shelf", FLOOR_TOP, 98],
+      ["shelf onto the upper platform", 98, 68],
+      ["upper onto the top platform", 68, 40],
+    ],
+    Electricity: [
+      ["floor onto the low shelf", FLOOR_TOP, 96],
+      ["low shelf onto the high shelf", 96, 74],
+      ["floor onto the locomotive's roof", FLOOR_TOP, TRAIN_TOP],
+      ["the locomotive's roof onto the exit shelf", TRAIN_TOP, EXIT_SHELF.y],
+    ],
+    "Water and electricity": [
+      ["floor onto the puddle shelf", FLOOR_TOP, 98],
+      ["shelf onto the upper platform", 98, 68],
+      ["floor onto the locomotive's roof", FLOOR_TOP, TRAIN_TOP],
+      ["the locomotive's roof onto the exit shelf", TRAIN_TOP, EXIT_SHELF.y],
+    ],
   };
 
-  const maxJumpHeight = (form: RobotForm) => {
-    const { jumpVelocity, gravity } = FORMS[form];
-    return (jumpVelocity * jumpVelocity) / (2 * gravity);
-  };
-
-  const CLIMBS: Array<[string, number, number]> = [
-    ["floor onto the puddle shelf", FLOOR_TOP, top(52)],
-    ["shelf onto the upper platform", top(52), top(104)],
-    ["upper onto the top platform", top(104), top(72)],
-    ["floor onto the step behind the gate", FLOOR_TOP, top(196)],
-    ["step onto the reward ledge", top(196), top(224)],
-  ];
-
-  it.each(CLIMBS)("%s is within both forms' reach", (_name, from, to) => {
-    const rise = from - to;
-    expect(rise).toBeGreaterThan(0);
-    expect(maxJumpHeight("dry")).toBeGreaterThan(rise + MARGIN);
-    expect(maxJumpHeight("water")).toBeGreaterThan(rise + MARGIN);
+  it("names every level, so a new one cannot skip the check", () => {
+    expect(Object.keys(CLIMBS).sort()).toEqual(LEVELS.map((l) => l.name).sort());
   });
 
+  it.each(LEVELS.map((l) => [l.name] as const))("%s: every climb clears every form", (name) => {
+    for (const [what, from, to] of CLIMBS[name]) {
+      const rise = from - to;
+      expect(rise, `${what} should go up`).toBeGreaterThan(0);
+      for (const form of ALL_FORMS) {
+        expect(maxJumpHeight(form), `${what}: the ${form} form`).toBeGreaterThan(rise + MARGIN);
+      }
+    }
+  });
+
+  it.each(LEVELS.map((l) => [l.name, l] as const))(
+    "%s: every platform it lists is a surface a climb lands on",
+    (name, level) => {
+      const tops = new Set(CLIMBS[name].map(([, , to]) => to));
+      for (const p of level.platforms) {
+        // The floor, the sealed door beam and the tunnel wall are not landings.
+        if (p.y >= FLOOR_TOP || p.y === 0) continue;
+        expect(tops, `nothing in ${name} climbs onto the platform at y=${p.y}`).toContain(p.y);
+      }
+    },
+  );
+
   it("leaves the heavy form room to walk under the puddle shelf", () => {
-    const shelf = platforms.find((p) => p.x === 52)!;
+    const shelf = LEVELS[0].platforms.find((p) => p.y === 98)!;
     const headroom = FLOOR_TOP - FORMS.water.height;
 
     // A 16px-thick shelf low enough to jump onto would be too low to duck
@@ -241,6 +266,7 @@ describe("every platform is reachable", () => {
     expect(shelf.y + shelf.height).toBeLessThan(headroom);
   });
 });
+
 
 describe("changing form", () => {
   it("grows about the feet, so the robot never sinks into the floor", () => {
@@ -273,7 +299,7 @@ describe("geometry helpers", () => {
   });
 
   it("rests the puddle on a real surface rather than floating it", () => {
-    const shelf = platforms.find(
+    const shelf = LEVELS[0].platforms.find(
       (p) =>
         PUDDLE.y + PUDDLE.height === p.y &&
         PUDDLE.x >= p.x &&

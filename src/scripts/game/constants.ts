@@ -47,6 +47,23 @@ export const WATER_ROBOT_PALETTE: Palette = {
   9: "#eafcff", // droplet sparkle
 };
 
+/**
+ * Charged up: the same hull, but running hot. Everything is a step brighter
+ * than the dry form and the shadows are pushed towards cyan, so the form reads
+ * as lit from inside rather than merely repainted.
+ */
+export const ELECTRIC_ROBOT_PALETTE: Palette = {
+  1: "#1b1140", // outline, deep violet so the hull pops off it
+  2: "#a8ecff", // charged shell
+  3: "#ffffff", // shell highlight
+  4: "#54c6f0", // shell shadow
+  5: "#2f86c4", // deep shadow
+  6: "#fff6b0", // visor, running hot
+  7: "#ffffff", // visor highlight
+  8: "#ffe24a", // the bolt on its chest, and the antenna spark
+  9: "#fffbdc", // bolt bloom
+};
+
 /** Puddle, pressure plate, conduit and portcullis. */
 export const PUZZLE_PALETTE = {
   waterDeep: "#1d5f80",
@@ -113,4 +130,62 @@ export const TOY_ROCKET_PALETTE: Palette = {
   4: "#bcc7d2", // hull shadow
   5: "#ef4b6b", // nose and fins
   6: "#9fe8ff", // porthole glass
+};
+
+// ---------------------------------------------------------- the electric puzzle
+
+/** Toy D-cell, still holding its charge. */
+export const BATTERY_PALETTE: Palette = {
+  1: "#1a1226", // outline
+  2: "#f2b23a", // wrapper
+  3: "#ffd98a", // wrapper highlight
+  4: "#b7791f", // wrapper shadow
+  5: "#c8d2dc", // steel cap and base
+  6: "#f2f7fb", // steel highlight
+  7: "#6e7b8a", // steel shadow
+  8: "#2b1a3a", // the bolt printed on the wrapper
+  9: "#fff2b0", // terminal spark
+};
+
+/**
+ * The same battery once the robot has drained it. Identical indices, every hue
+ * pulled to grey — a spent cell should read as spent at a glance, from across
+ * the room, without a caption.
+ */
+export const BATTERY_SPENT_PALETTE: Palette = {
+  1: "#1a1226",
+  2: "#6b6470",
+  3: "#8b8494",
+  4: "#4b4652",
+  5: "#6f7580",
+  6: "#8d939c",
+  7: "#4a4f58",
+  8: "#2b2a33",
+  9: "#6b6470",
+};
+
+/** Toy locomotive. Red engine, brass trim, dark wheels. */
+export const TRAIN_PALETTE: Palette = {
+  1: "#2a1220", // outline
+  2: "#e04a5c", // engine red
+  3: "#ff97a4", // red highlight
+  4: "#a5253d", // red shadow
+  5: "#ffd166", // brass trim
+  6: "#2b3242", // dark metal: funnel and wheels
+  7: "#8d97a8", // light metal: footplate
+  8: "#1a2338", // cab window
+  9: "#6b5320", // headlamp lens, unlit
+};
+
+/** Rail, tunnel and the charge running between them. */
+export const CIRCUIT_PALETTE = {
+  railTie: "#4a3520",
+  railTieLit: "#6b4f2c",
+  railOff: "#6b7686",
+  railOn: "#ffe24a",
+  railGlow: "#fff6b0",
+  lampLit: "#fff6b0",
+  lampCore: "#ffffff",
+  tunnel: "#0b0818",
+  tunnelArch: "#4a3520",
 };

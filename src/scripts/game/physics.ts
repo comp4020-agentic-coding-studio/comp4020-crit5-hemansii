@@ -20,6 +20,21 @@ function overlapsY(a: Rect, b: Rect): boolean {
   return a.y < b.y + b.height && a.y + a.height > b.y;
 }
 
+/** True when two rectangles genuinely intersect; touching edges do not count. */
+export function rectsOverlap(a: Rect, b: Rect): boolean {
+  return overlapsX(a, b) && overlapsY(a, b);
+}
+
+/** A rectangle grown by `by` on every side. Turns "touching" into a testable overlap. */
+export function inflate(rect: Rect, by: number): Rect {
+  return {
+    x: rect.x - by,
+    y: rect.y - by,
+    width: rect.width + by * 2,
+    height: rect.height + by * 2,
+  };
+}
+
 export function applyGravity(vy: number, dt: number, gravity = GRAVITY): number {
   return vy + gravity * dt;
 }

@@ -24,6 +24,46 @@ export function applyGravity(vy: number, dt: number): number {
   return vy + GRAVITY * dt;
 }
 
+export interface Bounds {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+}
+
+/**
+ * Keeps a body inside the playable area. A body that would cross an edge is
+ * placed flush against it and loses the velocity pushing it outwards, so it
+ * can never walk or fall off the screen. `hitFloor` reports the bottom edge
+ * acting as ground, so a body resting there can still jump.
+ */
+export function clampToBounds(
+  body: MovingBody,
+  bounds: Bounds,
+): { x: number; y: number; vx: number; vy: number; hitFloor: boolean } {
+  let { x, y, vx, vy } = body;
+  let hitFloor = false;
+
+  if (x < bounds.minX) {
+    x = bounds.minX;
+    if (vx < 0) vx = 0;
+  } else if (x + body.width > bounds.maxX) {
+    x = bounds.maxX - body.width;
+    if (vx > 0) vx = 0;
+  }
+
+  if (y < bounds.minY) {
+    y = bounds.minY;
+    if (vy < 0) vy = 0;
+  } else if (y + body.height > bounds.maxY) {
+    y = bounds.maxY - body.height;
+    if (vy > 0) vy = 0;
+    hitFloor = true;
+  }
+
+  return { x, y, vx, vy, hitFloor };
+}
+
 /**
  * Resolves vertical movement against a set of platforms. A body falling
  * (vy > 0) that would end the frame overlapping a platform it was above at

@@ -1,19 +1,38 @@
-import { CANVAS_WIDTH, CANVAS_HEIGHT, ROBOT_PALETTE, FIXED_DT } from "./constants";
+import {
+  CANVAS_WIDTH,
+  CANVAS_HEIGHT,
+  ROBOT_PALETTE,
+  ROBOT_SPRITE_OFFSET_X,
+  ROBOT_SPRITE_OFFSET_Y,
+  FIXED_DT,
+} from "./constants";
 import { InputTracker } from "./input";
 import { createRobot, updateRobot, type Robot } from "./robot";
-import { platforms, drawBackground, drawPlatforms, drawToys } from "./world";
+import {
+  platforms,
+  drawBackground,
+  drawPlatforms,
+  drawToys,
+  drawRobotShadow,
+  drawAmbience,
+} from "./world";
 import { drawPixelGrid, ROBOT_GRID } from "./sprites";
 
 const MAX_DT = 1 / 20; // clamp long frames (tab switches) so physics stays stable
 
 function drawRobot(ctx: CanvasRenderingContext2D, robot: Robot): void {
+  // The sprite is wider and taller than the hitbox, so it hangs off it a little.
+  const spriteWidth = ROBOT_GRID[0].length;
+  const x = robot.x + ROBOT_SPRITE_OFFSET_X;
+  const y = robot.y + ROBOT_SPRITE_OFFSET_Y;
+
   ctx.save();
   if (robot.facing === -1) {
-    ctx.translate(robot.x + robot.width, robot.y);
+    ctx.translate(x + spriteWidth, y);
     ctx.scale(-1, 1);
     drawPixelGrid(ctx, ROBOT_GRID, ROBOT_PALETTE, 0, 0, 1);
   } else {
-    drawPixelGrid(ctx, ROBOT_GRID, ROBOT_PALETTE, robot.x, robot.y, 1);
+    drawPixelGrid(ctx, ROBOT_GRID, ROBOT_PALETTE, x, y, 1);
   }
   ctx.restore();
 }
@@ -46,7 +65,9 @@ export function startGame(canvas: HTMLCanvasElement): void {
     drawBackground(ctx);
     drawPlatforms(ctx);
     drawToys(ctx);
+    drawRobotShadow(ctx, robot);
     drawRobot(ctx, robot);
+    drawAmbience(ctx);
 
     requestAnimationFrame(frame);
   }

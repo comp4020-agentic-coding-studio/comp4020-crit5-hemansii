@@ -4,9 +4,11 @@ import {
   GROUND_FRICTION,
   ROBOT_WIDTH,
   ROBOT_HEIGHT,
+  WORLD_BOUNDS,
 } from "./constants";
 import {
   applyGravity,
+  clampToBounds,
   resolveHorizontalCollision,
   resolveVerticalCollision,
   type Rect,
@@ -67,4 +69,13 @@ export function updateRobot(
   robot.y = vertical.y;
   robot.vy = vertical.vy;
   robot.grounded = vertical.grounded;
+
+  // Last word on position: the robot can never leave the playable area, no
+  // matter what the collision pass resolved to.
+  const bounded = clampToBounds(robot, WORLD_BOUNDS);
+  robot.x = bounded.x;
+  robot.y = bounded.y;
+  robot.vx = bounded.vx;
+  robot.vy = bounded.vy;
+  if (bounded.hitFloor) robot.grounded = true;
 }

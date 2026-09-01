@@ -1,28 +1,20 @@
 export const CANVAS_WIDTH = 256;
 export const CANVAS_HEIGHT = 144;
 
+/** Fallback gravity. Each form carries its own — see FORMS in forms.ts. */
 export const GRAVITY = 480; // px/s^2
 export const FIXED_DT = 1 / 120; // physics substep, small enough no fall skips a platform in one step
-export const MOVE_SPEED = 70; // px/s
-export const JUMP_VELOCITY = -210; // px/s
-export const GROUND_FRICTION = 0.82; // velocity multiplier per frame when no input
-
-export const ROBOT_WIDTH = 12;
-export const ROBOT_HEIGHT = 14;
-
-/** The sprite overhangs the hitbox slightly so it has room for shoulders and feet. */
-export const ROBOT_SPRITE_OFFSET_X = -1;
-export const ROBOT_SPRITE_OFFSET_Y = -2;
 
 /**
- * The hitbox is held a little in from the canvas edges, because the sprite
- * overhangs it: 1px each side and 2px above. Clamping the hitbox to the raw
- * canvas would still shave the robot's arm off against the wall.
+ * The hitbox is held in from the canvas edges, because every robot sprite
+ * overhangs it — up to 2px each side on the water form's landing frame, and
+ * 2px above. Clamping the hitbox to the raw canvas would still shave an arm
+ * off against the wall.
  */
 export const WORLD_BOUNDS = {
-  minX: 1,
+  minX: 2,
   minY: 2,
-  maxX: CANVAS_WIDTH - 1,
+  maxX: CANVAS_WIDTH - 2,
   maxY: CANVAS_HEIGHT,
 };
 
@@ -41,6 +33,38 @@ export const ROBOT_PALETTE: Palette = {
   7: "#c6f7ff", // visor highlight
   8: "#ff7a45", // indicator light
   9: "#ffd48a", // indicator bloom
+};
+
+export const WATER_ROBOT_PALETTE: Palette = {
+  1: "#12303f", // outline
+  2: "#7fd4e8", // water-filled shell
+  3: "#cdf4fd", // shell highlight
+  4: "#3f9dc0", // water settled in the belly
+  5: "#2b7f9e", // deep shadow
+  6: "#25d9ff", // visor glow
+  7: "#c6f7ff", // visor highlight
+  8: "#ff7a45", // indicator light
+  9: "#eafcff", // droplet sparkle
+};
+
+/** Puddle, pressure plate, conduit and portcullis. */
+export const PUZZLE_PALETTE = {
+  waterDeep: "#1d5f80",
+  waterMid: "#3fa0c8",
+  waterLight: "#7fd4e8",
+  waterGlint: "#eafcff",
+  plateFrame: "#2e2116",
+  plateFace: "#b9c2cd",
+  plateFaceLit: "#8fe3b0",
+  plateStripe: "#7d8794",
+  plateStripeLit: "#5fbf8a",
+  plateRim: "#e6edf5",
+  conduitOff: "#3c3454",
+  conduitOn: "#7ef0c0",
+  metal: "#6b7686",
+  metalLight: "#9aa7b6",
+  metalDark: "#333c48",
+  doorway: "#140e22",
 };
 
 export const PLATFORM_PALETTE: Palette = {

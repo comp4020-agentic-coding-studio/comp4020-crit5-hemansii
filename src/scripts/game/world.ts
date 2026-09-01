@@ -2,6 +2,7 @@ import {
   CANVAS_WIDTH,
   CANVAS_HEIGHT,
   PLATFORM_PALETTE,
+  PUZZLE_PALETTE,
   TOY_BALL_PALETTE,
   TOY_BLOCK_PALETTE,
   TOY_PLUSH_PALETTE,
@@ -9,6 +10,15 @@ import {
   type Palette,
 } from "./constants";
 import type { Rect } from "./physics";
+import {
+  GATE,
+  PLATE_TRAVEL,
+  PLATE_WIDTH,
+  PLATE_X,
+  PUDDLE,
+  plateTop,
+  type PuzzleState,
+} from "./puzzle";
 import {
   drawPixelGrid,
   drawSilhouette,
@@ -35,20 +45,27 @@ export interface Toy {
   palette: Palette;
 }
 
+/**
+ * Level layout. The critical path is all at floor level plus the low steps
+ * behind the gate, so the heavier water form can walk the whole puzzle; the
+ * taller platforms are dry-form territory.
+ */
 export const platforms: Rect[] = [
-  { x: 0, y: FLOOR_Y, width: CANVAS_WIDTH, height: TILE_SIZE },
-  { x: 40, y: CANVAS_HEIGHT - 52, width: 32, height: TILE_SIZE },
-  { x: 110, y: CANVAS_HEIGHT - 76, width: 32, height: TILE_SIZE },
-  { x: 176, y: CANVAS_HEIGHT - 52, width: 32, height: TILE_SIZE },
-  { x: 200, y: CANVAS_HEIGHT - 100, width: 32, height: TILE_SIZE },
+  { x: 0, y: FLOOR_Y, width: CANVAS_WIDTH, height: TILE_SIZE }, // floor
+  { x: 44, y: 88, width: 32, height: TILE_SIZE },
+  { x: 96, y: 60, width: 32, height: TILE_SIZE },
+  { x: 142, y: 88, width: 32, height: TILE_SIZE },
+  { x: 178, y: 0, width: 16, height: 48 }, // door beam; seals the top of the gateway
+  { x: 206, y: 112, width: 16, height: TILE_SIZE }, // step, behind the gate
+  { x: 224, y: 92, width: 32, height: TILE_SIZE }, // reward ledge
 ];
 
 export const toys: Toy[] = [
-  { x: 84, y: 110, grid: TOY_BLOCK_GRID, palette: TOY_BLOCK_PALETTE },
-  { x: 146, y: 114, grid: TOY_BALL_GRID, palette: TOY_BALL_PALETTE },
-  { x: 49, y: 78, grid: TOY_BALL_GRID, palette: TOY_BALL_PALETTE },
-  { x: 118, y: 54, grid: TOY_PLUSH_GRID, palette: TOY_PLUSH_PALETTE },
-  { x: 209, y: 28, grid: TOY_ROCKET_GRID, palette: TOY_ROCKET_PALETTE },
+  { x: 53, y: 74, grid: TOY_BALL_GRID, palette: TOY_BALL_PALETTE },
+  { x: 78, y: 114, grid: TOY_BALL_GRID, palette: TOY_BALL_PALETTE },
+  { x: 104, y: 46, grid: TOY_PLUSH_GRID, palette: TOY_PLUSH_PALETTE },
+  { x: 148, y: 70, grid: TOY_BLOCK_GRID, palette: TOY_BLOCK_PALETTE },
+  { x: 232, y: 76, grid: TOY_ROCKET_GRID, palette: TOY_ROCKET_PALETTE },
 ];
 
 // ---------------------------------------------------------------- primitives
@@ -76,8 +93,9 @@ function fillEllipse(
   ry: number,
   color: string,
 ): void {
+  if (rx <= 0 || ry <= 0) return;
   ctx.fillStyle = color;
-  for (let y = -ry; y <= ry; y++) {
+  for (let y = -Math.ceil(ry); y <= Math.ceil(ry); y++) {
     const t = 1 - (y * y) / (ry * ry);
     if (t <= 0) continue;
     const span = Math.floor(rx * Math.sqrt(t));
@@ -116,7 +134,6 @@ function drawBunting(ctx: CanvasRenderingContext2D): void {
       if (half <= 0) continue;
       ctx.fillStyle = face;
       ctx.fillRect(x - half, top + row, half * 2, 1);
-      // a lit left edge so each flag has a little form
       ctx.fillStyle = lit;
       ctx.fillRect(x - half, top + row, 1, 1);
     }
@@ -131,7 +148,6 @@ function drawPorthole(ctx: CanvasRenderingContext2D, cx: number, cy: number): vo
   fillCircle(ctx, cx, cy, 12, "#5d6a7c");
   fillCircle(ctx, cx, cy, 11, "#0e1730");
 
-  // night sky gradient inside the glass
   ctx.save();
   ctx.beginPath();
   ctx.arc(cx + 0.5, cy + 0.5, 11, 0, Math.PI * 2);
@@ -155,12 +171,10 @@ function drawPorthole(ctx: CanvasRenderingContext2D, cx: number, cy: number): vo
     ctx.fillStyle = color;
     ctx.fillRect(cx + dx, cy + dy, 1, 1);
   }
-  // a small crescent moon
   fillCircle(ctx, cx + 5, cy - 6, 4, "#ffe9a8");
   fillCircle(ctx, cx + 7, cy - 7, 4, "#132048");
   ctx.restore();
 
-  // rim light on the frame, top-left
   ctx.fillStyle = "#d6dee6";
   for (let a = Math.PI * 0.75; a < Math.PI * 1.45; a += 0.06) {
     ctx.fillRect(Math.round(cx + Math.cos(a) * 13), Math.round(cy + Math.sin(a) * 13), 1, 1);
@@ -172,22 +186,15 @@ function drawWallpaper(ctx: CanvasRenderingContext2D): void {
     const y = 8 + row * 18;
     const offset = row % 2 === 0 ? 0 : 13;
     for (let x = 6 + offset; x < CANVAS_WIDTH; x += 26) {
-      // four-point star
       ctx.fillStyle = "rgba(255, 236, 200, 0.09)";
       ctx.fillRect(x, y - 1, 1, 3);
       ctx.fillRect(x - 1, y, 3, 1);
-      // a dot between stars
       ctx.fillStyle = "rgba(255, 236, 200, 0.055)";
       ctx.fillRect(x + 13, y + 9, 1, 1);
     }
   }
 }
 
-/**
- * Breaks the tiled floor into individual boards. Seen edge-on a rug would just
- * be a stripe, so the floor earns its detail from carpentry instead: board
- * joins, a lit chamfer beside each, and a slight warm/cool drift across the run.
- */
 function drawFloorBoards(ctx: CanvasRenderingContext2D): void {
   for (let x = 0; x < CANVAS_WIDTH; x += 32) {
     ctx.fillStyle = PLATFORM_PALETTE[5];
@@ -196,7 +203,6 @@ function drawFloorBoards(ctx: CanvasRenderingContext2D): void {
     ctx.fillRect(x + 1, FLOOR_Y + 1, 1, TILE_SIZE - 2);
   }
 
-  // Warm the boards nearer the lamp and cool the ones furthest from it.
   const drift = ctx.createLinearGradient(0, 0, CANVAS_WIDTH, 0);
   drift.addColorStop(0, "rgba(255, 198, 128, 0.10)");
   drift.addColorStop(0.35, "rgba(255, 198, 128, 0.03)");
@@ -213,7 +219,6 @@ function buildBackground(): HTMLCanvasElement {
   canvas.height = CANVAS_HEIGHT;
   const ctx = canvas.getContext("2d")!;
 
-  // Back wall: cool indigo up top warming towards the floor.
   const wall = ctx.createLinearGradient(0, 0, 0, CANVAS_HEIGHT);
   wall.addColorStop(0, "#3b2f5e");
   wall.addColorStop(0.55, "#2f2449");
@@ -223,7 +228,6 @@ function buildBackground(): HTMLCanvasElement {
 
   drawWallpaper(ctx);
 
-  // Warm lamp pool spilling in from the upper left, the scene's key light.
   const lamp = ctx.createRadialGradient(LIGHT_X, -20, 10, LIGHT_X, -20, 190);
   lamp.addColorStop(0, "rgba(255, 208, 138, 0.22)");
   lamp.addColorStop(0.5, "rgba(255, 190, 130, 0.09)");
@@ -231,21 +235,17 @@ function buildBackground(): HTMLCanvasElement {
   ctx.fillStyle = lamp;
   ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
-  drawPorthole(ctx, 42, 44);
+  drawPorthole(ctx, 42, 40);
   drawBunting(ctx);
 
-  // Toys further back in the room, flattened to silhouettes so they recede.
-  drawSilhouette(ctx, TOY_PLUSH_GRID, "#352a52", 226, 100, 2);
-  drawSilhouette(ctx, TOY_BLOCK_GRID, "#31274c", 4, 96, 2);
+  drawSilhouette(ctx, TOY_PLUSH_GRID, "#352a52", 66, 100, 2);
 
-  // Ambient occlusion where the wall meets the floor.
   const junction = ctx.createLinearGradient(0, FLOOR_Y - 22, 0, FLOOR_Y);
   junction.addColorStop(0, "rgba(10, 5, 22, 0)");
   junction.addColorStop(1, "rgba(10, 5, 22, 0.42)");
   ctx.fillStyle = junction;
   ctx.fillRect(0, FLOOR_Y - 22, CANVAS_WIDTH, 22);
 
-  // Dust motes catching the lamp light.
   const motes: Array<[number, number, number]> = [
     [38, 30, 0.18],
     [72, 18, 0.12],
@@ -269,10 +269,23 @@ export function drawBackground(ctx: CanvasRenderingContext2D): void {
   ctx.drawImage(backgroundCache, 0, 0);
 }
 
-/** Repaints one pixel of cached background, used to round platform corners. */
 function restoreBackgroundPixel(ctx: CanvasRenderingContext2D, x: number, y: number): void {
   if (!backgroundCache) return;
   ctx.drawImage(backgroundCache, x, y, 1, 1, x, y, 1, 1);
+}
+
+/** The passage the portcullis guards, drawn before the platforms sit on top of it. */
+export function drawDoorway(ctx: CanvasRenderingContext2D): void {
+  ctx.fillStyle = PUZZLE_PALETTE.doorway;
+  ctx.fillRect(GATE.x, GATE.y, GATE.width, GATE.height);
+  // light spilling in from the left edge of the opening
+  const glow = ctx.createLinearGradient(GATE.x, 0, GATE.x + GATE.width, 0);
+  glow.addColorStop(0, "rgba(255, 214, 160, 0.16)");
+  glow.addColorStop(1, "rgba(255, 214, 160, 0)");
+  ctx.fillStyle = glow;
+  ctx.fillRect(GATE.x, GATE.y, GATE.width, GATE.height);
+  ctx.fillStyle = "rgba(0,0,0,0.35)";
+  ctx.fillRect(GATE.x + GATE.width - 1, GATE.y, 1, GATE.height);
 }
 
 // ---------------------------------------------------------------- platforms
@@ -281,7 +294,6 @@ export function drawPlatforms(ctx: CanvasRenderingContext2D): void {
   for (const platform of platforms) {
     const isFloor = platform.y >= FLOOR_Y;
 
-    // Cast shadow, offset away from the key light.
     if (!isFloor) {
       ctx.fillStyle = SHADOW;
       ctx.fillRect(platform.x + 2, platform.y + platform.height, platform.width, 2);
@@ -289,28 +301,187 @@ export function drawPlatforms(ctx: CanvasRenderingContext2D): void {
       ctx.fillRect(platform.x + 4, platform.y + platform.height + 2, platform.width - 2, 2);
     }
 
-    for (let x = platform.x; x < platform.x + platform.width; x += TILE_SIZE) {
-      drawPixelGrid(ctx, PLATFORM_TILE, PLATFORM_PALETTE, x, platform.y, 1);
+    // Clip so a platform whose size is not a whole number of tiles still stops
+    // exactly at its own edges.
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(platform.x, platform.y, platform.width, platform.height);
+    ctx.clip();
+    for (let y = platform.y; y < platform.y + platform.height; y += TILE_SIZE) {
+      for (let x = platform.x; x < platform.x + platform.width; x += TILE_SIZE) {
+        drawPixelGrid(ctx, PLATFORM_TILE, PLATFORM_PALETTE, x, y, 1);
+      }
     }
+    ctx.restore();
 
     if (isFloor) continue;
 
-    // A dark edge all round turns repeating texture into a solid object.
     ctx.fillStyle = PLATFORM_PALETTE[1];
     ctx.fillRect(platform.x, platform.y, 1, platform.height);
     ctx.fillRect(platform.x + platform.width - 1, platform.y, 1, platform.height);
     ctx.fillRect(platform.x, platform.y + platform.height - 1, platform.width, 1);
 
-    // Warm rim along the lit top edge, cooling towards the shadowed side.
     ctx.fillStyle = PLATFORM_PALETTE[6];
     ctx.fillRect(platform.x + 1, platform.y, platform.width - 2, 1);
 
-    // Knock the top corners off so the block reads as a rounded toy.
     restoreBackgroundPixel(ctx, platform.x, platform.y);
     restoreBackgroundPixel(ctx, platform.x + platform.width - 1, platform.y);
   }
 
   drawFloorBoards(ctx);
+}
+
+// ------------------------------------------------------------------- puzzle
+
+/** Shallow water, shimmering enough to read as something you can walk into. */
+export function drawPuddle(
+  ctx: CanvasRenderingContext2D,
+  state: PuzzleState,
+  time: number,
+): void {
+  const amount = state.puddleAmount;
+  if (amount <= 0.02) return;
+
+  const cx = PUDDLE.x + PUDDLE.width / 2;
+  const cy = FLOOR_Y - 1;
+  const breathe = Math.sin(time * 2.2) * 0.5;
+  const rx = (PUDDLE.width / 2) * amount + breathe;
+  const ry = 3 * amount;
+
+  fillEllipse(ctx, cx, cy, rx, ry, PUZZLE_PALETTE.waterDeep);
+  fillEllipse(ctx, cx, cy, rx - 1, ry - 0.8, PUZZLE_PALETTE.waterMid);
+  fillEllipse(ctx, cx - 1, cy - 1, (rx - 3) * 0.7, 1, PUZZLE_PALETTE.waterLight);
+
+  // glints drifting across the surface
+  for (let i = 0; i < 3; i++) {
+    const p = (time * 0.32 + i / 3) % 1;
+    const gx = cx - rx + p * rx * 2;
+    const fade = Math.sin(p * Math.PI);
+    if (fade < 0.3) continue;
+    ctx.fillStyle = PUZZLE_PALETTE.waterGlint;
+    ctx.fillRect(Math.round(gx), Math.round(cy - 1), 1, 1);
+  }
+}
+
+/** The pressure plate: a wide, shallow button that visibly sinks under weight. */
+export function drawPlate(
+  ctx: CanvasRenderingContext2D,
+  state: PuzzleState,
+  time: number,
+): void {
+  const top = Math.round(plateTop(state));
+  const lit = state.latched;
+  const wellTop = FLOOR_Y - PLATE_TRAVEL;
+
+  // The well the pad sits in, sunk into the floorboards.
+  ctx.fillStyle = PUZZLE_PALETTE.plateFrame;
+  ctx.fillRect(PLATE_X - 3, wellTop - 1, PLATE_WIDTH + 6, PLATE_TRAVEL + 5);
+  ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+  ctx.fillRect(PLATE_X - 1, wellTop, PLATE_WIDTH + 2, PLATE_TRAVEL + 2);
+
+  // The pad itself, riding up and down inside the well.
+  const faceHeight = FLOOR_Y + 2 - top;
+  ctx.fillStyle = lit ? PUZZLE_PALETTE.plateFaceLit : PUZZLE_PALETTE.plateFace;
+  ctx.fillRect(PLATE_X, top, PLATE_WIDTH, faceHeight);
+
+  // Hazard chevrons read as "heavy duty" without spelling anything out.
+  ctx.fillStyle = lit ? PUZZLE_PALETTE.plateStripeLit : PUZZLE_PALETTE.plateStripe;
+  for (let i = -4; i < PLATE_WIDTH; i += 7) {
+    for (let r = 0; r < faceHeight; r++) {
+      const sx = PLATE_X + i + r;
+      const w = Math.min(3, PLATE_X + PLATE_WIDTH - sx);
+      if (sx >= PLATE_X && w > 0) ctx.fillRect(sx, top + r, w, 1);
+    }
+  }
+
+  // Lit rim along the top edge, and end caps so it reads as a machined part.
+  ctx.fillStyle = lit ? "#d8fbe8" : PUZZLE_PALETTE.plateRim;
+  ctx.fillRect(PLATE_X + 1, top, PLATE_WIDTH - 2, 1);
+  ctx.fillStyle = PUZZLE_PALETTE.metalDark;
+  ctx.fillRect(PLATE_X, top, 1, faceHeight);
+  ctx.fillRect(PLATE_X + PLATE_WIDTH - 1, top, 1, faceHeight);
+
+  // A light body gets movement but no light: the plate is clearly a moving
+  // part that simply is not moving enough.
+  if (state.lightTouch) {
+    const flicker = Math.sin(time * 18) > 0 ? 0.4 : 0.12;
+    ctx.fillStyle = `rgba(255, 122, 69, ${flicker})`;
+    ctx.fillRect(PLATE_X + 1, top, PLATE_WIDTH - 2, 1);
+  }
+}
+
+/** Conduit along the floor from plate to gate; carries a visible pulse when it fires. */
+export function drawConduit(
+  ctx: CanvasRenderingContext2D,
+  state: PuzzleState,
+  time: number,
+): void {
+  const from = PLATE_X + PLATE_WIDTH;
+  const to = GATE.x;
+  const y = FLOOR_Y + 2;
+
+  ctx.fillStyle = "rgba(0,0,0,0.45)";
+  ctx.fillRect(from, y - 1, to - from, 4);
+  ctx.fillStyle = PUZZLE_PALETTE.conduitOff;
+  ctx.fillRect(from, y, to - from, 2);
+
+  if (!state.latched) return;
+
+  const head = from + (to - from) * state.signal;
+  ctx.fillStyle = PUZZLE_PALETTE.conduitOn;
+  ctx.fillRect(from, y, Math.max(0, head - from), 2);
+
+  if (state.signal < 1) {
+    // bright leading edge of the pulse
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(Math.round(head) - 2, y - 1, 3, 4);
+  } else {
+    // steady glow, gently breathing, plus a travelling spark
+    const p = (time * 0.55) % 1;
+    ctx.fillStyle = "rgba(190, 255, 230, 0.85)";
+    ctx.fillRect(Math.round(from + (to - from) * p), y - 1, 2, 4);
+  }
+}
+
+/** The portcullis: slats that retract upwards into the beam above. */
+export function drawGate(ctx: CanvasRenderingContext2D, state: PuzzleState): void {
+  const height = GATE.height * (1 - state.gateOpenness);
+  if (height < 1) return;
+
+  const x = GATE.x;
+  const top = GATE.y;
+  const bottom = top + height;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(x, top, GATE.width, height);
+  ctx.clip();
+
+  // Vertical bars with the dark passage showing between them, so it reads as
+  // a portcullis you are being kept behind rather than a ladder.
+  for (const bx of [0, 4, 9, 14]) {
+    ctx.fillStyle = PUZZLE_PALETTE.metal;
+    ctx.fillRect(x + bx, top, 2, height);
+    ctx.fillStyle = PUZZLE_PALETTE.metalLight;
+    ctx.fillRect(x + bx, top, 1, height);
+    ctx.fillStyle = PUZZLE_PALETTE.metalDark;
+    ctx.fillRect(x + bx + 1, top, 1, height);
+  }
+
+  // cross-bands bracing the bars together
+  for (let y = top + 6; y < bottom - 4; y += 14) {
+    ctx.fillStyle = PUZZLE_PALETTE.metal;
+    ctx.fillRect(x, y, GATE.width, 2);
+    ctx.fillStyle = PUZZLE_PALETTE.metalLight;
+    ctx.fillRect(x, y, GATE.width, 1);
+  }
+
+  // heavy bottom bar
+  ctx.fillStyle = PUZZLE_PALETTE.metalDark;
+  ctx.fillRect(x, bottom - 4, GATE.width, 4);
+  ctx.fillStyle = PUZZLE_PALETTE.metal;
+  ctx.fillRect(x, bottom - 4, GATE.width, 1);
+  ctx.restore();
 }
 
 // --------------------------------------------------------------------- toys
@@ -319,7 +490,6 @@ export function drawToys(ctx: CanvasRenderingContext2D): void {
   for (const toy of toys) {
     const width = toy.grid[0].length;
     const height = toy.grid.length;
-    // Contact shadow grounds each toy on the surface it rests on.
     fillEllipse(ctx, toy.x + width / 2 + 1, toy.y + height - 1, width / 2 - 1, 2, CONTACT_SHADOW);
     drawPixelGrid(ctx, toy.grid, toy.palette, toy.x, toy.y, 1);
   }
@@ -330,11 +500,15 @@ export function drawToys(ctx: CanvasRenderingContext2D): void {
  * and shrinking with height. Purely visual, but it's what tells you where you
  * are about to land.
  */
-export function drawRobotShadow(ctx: CanvasRenderingContext2D, body: Rect): void {
+export function drawRobotShadow(
+  ctx: CanvasRenderingContext2D,
+  body: Rect,
+  colliders: Rect[],
+): void {
   const feet = body.y + body.height;
   let surface = Number.POSITIVE_INFINITY;
 
-  for (const platform of platforms) {
+  for (const platform of colliders) {
     const overlapsX = body.x < platform.x + platform.width && body.x + body.width > platform.x;
     if (!overlapsX) continue;
     if (platform.y + 1 >= feet && platform.y < surface) surface = platform.y;
@@ -360,14 +534,12 @@ function buildForeground(): HTMLCanvasElement {
   canvas.height = CANVAS_HEIGHT;
   const ctx = canvas.getContext("2d")!;
 
-  // Warm wash from the key light, over everything so the whole scene shares it.
   const warm = ctx.createRadialGradient(LIGHT_X, -10, 10, LIGHT_X, -10, 170);
   warm.addColorStop(0, "rgba(255, 206, 140, 0.12)");
   warm.addColorStop(1, "rgba(255, 206, 140, 0)");
   ctx.fillStyle = warm;
   ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
-  // Vignette, tinted violet rather than black so it stays in the palette.
   const vignette = ctx.createRadialGradient(
     CANVAS_WIDTH / 2,
     CANVAS_HEIGHT / 2,

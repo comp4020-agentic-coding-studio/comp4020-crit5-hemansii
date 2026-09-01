@@ -15,6 +15,11 @@ export function sprite(rows: string[]): SpriteGrid {
   );
 }
 
+/**
+ * `rowOffset` shifts whole rows sideways as they are drawn. Shearing the rows
+ * keeps every pixel square — which scaling a grid by a fraction would not — so
+ * it is how the water form gets its slosh without going soft at the edges.
+ */
 export function drawPixelGrid(
   ctx: CanvasRenderingContext2D,
   grid: SpriteGrid,
@@ -22,14 +27,16 @@ export function drawPixelGrid(
   x: number,
   y: number,
   scale = 1,
+  rowOffset?: (row: number) => number,
 ): void {
   for (let row = 0; row < grid.length; row++) {
     const cells = grid[row];
+    const shift = rowOffset ? rowOffset(row) * scale : 0;
     for (let col = 0; col < cells.length; col++) {
       const index = cells[col];
       if (index === 0) continue;
       ctx.fillStyle = palette[index];
-      ctx.fillRect(x + col * scale, y + row * scale, scale, scale);
+      ctx.fillRect(x + col * scale + shift, y + row * scale, scale, scale);
     }
   }
 }
@@ -76,6 +83,53 @@ export const ROBOT_GRID = sprite([
   ".144444444441.",
   "..1221..1221..",
   "..1441..1441..",
+]);
+
+// 18x20 water form: the same robot swollen with water. Rounder, heavier in the
+// belly, with the hull gone translucent blue and a waterline sitting low in it.
+export const WATER_ROBOT_GRID = sprite([
+  "........88........",
+  "........11........",
+  "....1111111111....",
+  "....1333222221....",
+  "...132222222221...",
+  "...126666666621...",
+  "...126776666621...",
+  "...124444444421...",
+  "...122222222221...",
+  "..11111111111111..",
+  ".1332222222222241.",
+  "113322222222222411",
+  "141222222222222141",
+  "141222228822222141",
+  "141222222222222141",
+  "141244444444442141",
+  "114444444444444411",
+  ".1144444444444411.",
+  "..11444444444411..",
+  "...1441....1441...",
+]);
+
+// 20x18 landing frame: the same body squashed wide and flat on impact.
+export const WATER_ROBOT_SQUASH = sprite([
+  ".........88.........",
+  ".........11.........",
+  "....111111111111....",
+  "...13332222222221...",
+  "...12666666666621...",
+  "...12677766666621...",
+  "...12444444444421...",
+  "...11111111111111...",
+  "..1111111111111111..",
+  ".113322222222222411.",
+  "11332222222222222411",
+  "14122222288222222141",
+  "14122222222222222141",
+  "14124444444444442141",
+  "11444444444444444411",
+  ".114444444444444411.",
+  "..1144444444444411..",
+  "..1441........1441..",
 ]);
 
 // 16x16 wooden block tile, repeated across a platform's width. Two tiers with

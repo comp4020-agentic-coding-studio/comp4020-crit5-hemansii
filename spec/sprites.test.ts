@@ -6,6 +6,7 @@ import {
   TOY_BLOCK_PALETTE,
   TOY_PLUSH_PALETTE,
   TOY_ROCKET_PALETTE,
+  WATER_ROBOT_PALETTE,
   type Palette,
 } from "../src/scripts/game/constants";
 import {
@@ -15,6 +16,8 @@ import {
   TOY_BLOCK_GRID,
   TOY_PLUSH_GRID,
   TOY_ROCKET_GRID,
+  WATER_ROBOT_GRID,
+  WATER_ROBOT_SQUASH,
   type SpriteGrid,
 } from "../src/scripts/game/sprites";
 
@@ -25,6 +28,8 @@ import {
  */
 const SPRITES: Array<{ name: string; grid: SpriteGrid; palette: Palette }> = [
   { name: "robot", grid: ROBOT_GRID, palette: ROBOT_PALETTE },
+  { name: "water robot", grid: WATER_ROBOT_GRID, palette: WATER_ROBOT_PALETTE },
+  { name: "water robot squash", grid: WATER_ROBOT_SQUASH, palette: WATER_ROBOT_PALETTE },
   { name: "platform tile", grid: PLATFORM_TILE, palette: PLATFORM_PALETTE },
   { name: "ball", grid: TOY_BALL_GRID, palette: TOY_BALL_PALETTE },
   { name: "blocks", grid: TOY_BLOCK_GRID, palette: TOY_BLOCK_PALETTE },
@@ -62,5 +67,17 @@ describe("the platform tile", () => {
   it("is fully opaque, so no wall shows through a solid block", () => {
     const transparent = PLATFORM_TILE.flat().filter((cell) => cell === 0);
     expect(transparent).toEqual([]);
+  });
+});
+
+describe("the water form's frames", () => {
+  it("squashes wider and shorter than it stands", () => {
+    expect(WATER_ROBOT_SQUASH[0].length).toBeGreaterThan(WATER_ROBOT_GRID[0].length);
+    expect(WATER_ROBOT_SQUASH.length).toBeLessThan(WATER_ROBOT_GRID.length);
+  });
+
+  it("is bigger than the dry robot in both directions", () => {
+    expect(WATER_ROBOT_GRID[0].length).toBeGreaterThan(ROBOT_GRID[0].length);
+    expect(WATER_ROBOT_GRID.length).toBeGreaterThan(ROBOT_GRID.length);
   });
 });

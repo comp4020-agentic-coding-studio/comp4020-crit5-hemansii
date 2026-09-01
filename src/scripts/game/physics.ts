@@ -20,8 +20,8 @@ function overlapsY(a: Rect, b: Rect): boolean {
   return a.y < b.y + b.height && a.y + a.height > b.y;
 }
 
-export function applyGravity(vy: number, dt: number): number {
-  return vy + GRAVITY * dt;
+export function applyGravity(vy: number, dt: number, gravity = GRAVITY): number {
+  return vy + gravity * dt;
 }
 
 export interface Bounds {
